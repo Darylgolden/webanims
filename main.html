@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MathBox - Field Lines</title>
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/three@0.137.0/examples/js/controls/TrackballControls.js"
+    ></script>
+    <!--
+       - a minified version mathbox.min.js is also available;
+       - recommend using a specific version (not @latest) in public sites
+    -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/mathbox@latest/build/bundle/mathbox.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@latest/build/dat.gui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/13.0.1/math.js"></script>
+    <script src="js-colormaps.js"></script>
+    <link rel="stylesheet" href="../../build/mathbox.css" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1" />
+  </head>
+<body>
+
+  <script>
+    
+    
+
+    function getComplexParametricFunction(functionString) {
+      var fun = function(input) {
+        let scope = {
+          t: input
+        }
+        return math.evaluate(functionString, scope);
+      }
+      fun(1);
+      return fun;
+    }
+
+    function getComplexFunction(functionString) {
+      var fun = function(input) {
+        let scope = {
+          z: input
+        }
+        return math.evaluate(functionString, scope);
+      }
+      fun(1);
+      return fun;
+    }
+
+    function rgbArrayToHex(rgb) {
+    // Ensure the array has exactly 3 elements
+    if (rgb.length !== 3) {
+        throw new Error("Array must have exactly 3 elements");
+    }
+
+    // Convert each component to a two-digit hex string
+    const hex = rgb.map(component => {
+        const hexComponent = component.toString(16);
+        return hexComponent.length === 1 ? "0" + hexComponent : hexComponent;
+    }).join('');
+
+    // Return the hex color code
+    return `#0x${hex}`;
+    }
+
+    function color_map(x) {
+      return rgbArrayToHex(plasma_r(x));
+    }
+
+    console.log(color_map(0.5));
+
+    console.log(plasma_r(0.5)[0]);
+    console.log(plasma_r(0.5)[1]);
+    console.log(plasma_r(0.5)[2]);
+
+    var gui = new dat.GUI();
+      var parameters = {
+        parametric_eq: "cos(t)+i*sin(t)",
+        complex_func: "0.2cos(z)"
+      }
+
+
+
+
+    paramGUI = gui.add(parameters, 'parametric_eq').name("z(t) = ")
+    funcGUI = gui.add(parameters, 'complex_func').name("f(z) = ")
+    var mathbox = MathBox.mathBox({
+      plugins: ["core", "controls", "cursor", "mathbox"],
+      controls: {
+        // Trackball controls, i.e. Free quaternion rotation
+        klass: THREE.TrackballControls,
+      },
+    });
+    if (mathbox.fallback) throw "WebGL not supported";
+
+    var three = mathbox.three;
+    three.renderer.setClearColor(new THREE.Color(0x000000), 1.0);
+	
+	// 1. determine where the camera is looking at...
+	
+	// setting proxy:true allows interactive controls to override base position
+	var camera = mathbox.camera( { proxy: true, position: [0, 0, 3] } );
+
+	// 2. coordinate system that contains...
+	
+	// save the view as a variable to simplify accessing it later
+    var view = mathbox.cartesian( {range: [[-6.28, 6.28], [-2, 2]], scale: [2,1]} );
+
+	// axes
+	var xAxis = view.axis( {axis: 1, width: 8, detail: 40, color:"red"} );
+	var yAxis = view.axis( {axis: 2, width: 8, detail: 40, color:"green"} );
+	
+	// grid
+	var grid = view.grid( {width: 2, divideX: 20, divideY: 10, opacity:0.25} );
+
+  // placeholder data
+    var graphData = view.interval({
+            expr: function (emit, x, i, t)
+                {
+            emit( x, 2*x );
+            },
+            // width is the number of data points to generate; higher numbers = higher resolution
+            width: 256,	
+            // channels indicate the dimensionality of the output (set to 2 for a 2D graph)
+            channels: 2,
+            range: [0, 6.28]
+        });
+	
+	// 3. geometric data represented via...
+	
+	// the interval function will create a 1D array of data sampled between the view bounds
+    var graphView = view.line( {width: 4, color: "blue"} );
+
+    function updateGraph() {
+        try {
+        updateGraphInternal()
+        } catch (e) {
+        console.log("hi")
+        }
+    }
+
+    function sigmoid(x) {
+      return (2 / (1 + math.exp(-x))) - 1;
+    }
+
+
+    function updateGraphInternal() {
+        try {
+        var paramFunction = getComplexParametricFunction(parameters.parametric_eq);
+        var complexFunction = getComplexFunction(parameters.complex_func);
+        graphData.set("expr",
+        function (emit, x, i, t)
+            {
+            emit(math.re(paramFunction(x)), math.im(paramFunction(x)));
+            }
+        )
+        test = complexFunction(math.complex(1, 1));
+        test.re;
+        test.im;
+        vectordataaa.set("expr",
+          function (emit, x, y, i, j) {
+            result = complexFunction(math.complex(x, y));
+            magnitude = math.sqrt( result.re ** 2 + result.im ** 2)
+            normalized = sigmoid(magnitude);
+            result = math.multiply(result, normalized / magnitude);
+            emit(x, y);
+            emit(x + result.re, y + result.im);
+          }
+        )
+
+        var colordataexpr = function (emit, x, y, z) {
+          result = complexFunction(math.complex(x, y));
+          if (!isNaN(result)) {
+            magnitude = math.abs(result);
+            normalized = sigmoid(magnitude);
+            normalized = math.min(normalized, 1);
+            console.log(normalized);
+            emit(turbo(normalized)[0] / 255, turbo(normalized)[1] / 255, turbo(normalized)[2] / 255, 1);
+            colordata.set("expr", colordataexpr);
+          }
+        }
+        } catch (e) {
+        console.log("meow")
+        }
+    }
+
+    updateGraph();
+	
+	// 4. choice of shape to draw it as...
+	
+    // var vectorfielddata = view.area(
+    //     {
+    //         expr: function (emit, x, y, i, j, t, d) 
+    //         {
+    //             emit(x, y);
+    //             emit(1, 1);
+    //         },
+    //         channels: 2
+    //     }
+    // )
+
+    // view.vector({
+    //     color: 0x3090ff,
+    //     width: 6,
+    //     depth: 1,
+    //     size: 2,
+    //     end: true,
+    //     zWrite: false,
+    //     blending: THREE.AdditiveBlending,
+    //   });
+
+
+
+      var expression = function (emit, x, y, z, i, j, k) {
+        // dipole magnetic field
+
+        emit(x, y, z);
+        emit(x+0.1,y+ 0.1, z+0.1);
+      };
+
+      var expression2d = function(emit, x, y, i, j) {
+        emit(x, y);
+        emit(x + 0.1, y + 0.1);
+      }
+
+      var expression4d = function(emit, x, y, z) {
+        emit(x, y, 0, 1);
+      }
+
+    //   view.volume({
+    //     id: "sampler",
+    //     width: 12,
+    //     height: 12,
+    //     depth: 12,
+    //     expr: expression,
+    //     items: 2,
+    //     channels: 3,
+    //   });
+    //   view.vector({
+    //     color: 0xff0000,
+    //     width: 6,
+    //     depth: 1,
+    //     size: 2,
+    //     end: true,
+    //     // zWrite: false,
+    //     // blending: THREE.AdditiveBlending,
+    //   });
+
+    // placeholder
+
+    var paramFunction = getComplexParametricFunction(parameters.parametric_eq);
+    var complexFunction = getComplexFunction(parameters.complex_func);
+    
+      var colordata = view.volume({
+        id: "colordata",
+        width: 12,
+        height: 12,
+        expr: expression4d
+      })
+
+      var vectordataaa = view.area({
+        id: "vectordataaa",
+        width: 12,
+        height: 12,
+        expr: function (emit, x, y, i, j) {
+            result = complexFunction(math.complex(x, y));
+            magnitude = math.sqrt( result.re ** 2 + result.im ** 2)
+            normalized = sigmoid(magnitude);
+            result = math.multiply(result, normalized / magnitude);
+            emit(x, y);
+            emit(x + result.re, y + result.im);
+          },
+        items: 2,
+        channels: 2,
+      })
+      var vectors = view.vector({
+        colors: "#colordata",
+        color: "#0xffffff",
+        width: 6,
+        depth: 1,
+        size: 2,
+        end: true,
+        // zWrite: false,
+        // blending: THREE.AdditiveBlending,
+      });
+	
+    // var vectors = view.vector({
+    //     color: 0xa00040,
+    //     width: 1,
+    //     zBias: 3,
+    //     end: true,
+    // }, {
+    //     visible: () => true
+    // })
+    // var pts = view.interval({
+
+    // })
+	// alternatively, to view the data as point
+
+    // view.area({
+    //     id: "sampler",
+    //     width: 83,
+    //     height: 83,
+    //     axes: [1, 3],
+    //     expr: function (emit, x, y, i, j, t) {
+    //       emit(
+    //         x,
+    //         3 * (0.5 + 0.5 * (Math.sin(x + t) * Math.sin(y + t))),
+    //         y
+    //       );
+    //     },
+    //     channels: 3,
+    //   });
+	
+    // var graphData2 = view.interval({
+    //     expr: function (emit, x, i, t)
+	// 	{
+    //       emit( x, Math.cos(x) );
+    //     },
+	// 	// width is the number of data points to generate; higher numbers = higher resolution
+    //     width: 256,	
+	// 	// channels indicate the dimensionality of the output (set to 2 for a 2D graph)
+    //     channels: 2,
+    //     range: [0, 6.28]
+    // });
+
+    // var graphView2 = view.line( {width: 4, color: "red"})
+
+    paramGUI.onChange(updateGraph);
+    funcGUI.onChange(updateGraph);
+
+    gui.open()
+	</script>
+</body>
+</html>
